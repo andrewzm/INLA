@@ -1,6 +1,8 @@
 ## Export: inla.link.log inla.link.invlog inla.link.logit inla.link.invlogit inla.link.probit
-## Export: inla.link.invprobit inla.link.cloglog inla.link.invcloglog inla.link.tan inla.link.invtan
+## Export: inla.link.invprobit inla.link.cloglog inla.link.invcloglog 
+## Export: inla.link.loglog inla.link.invloglog inla.link.tan inla.link.invtan
 ## Export: inla.link.identity inla.link.invidentity inla.link.invalid
+## Export: inla.link.cauchit inla.link.invcauchit
 
 ##! \name{link}
 ##! \alias{link}
@@ -13,12 +15,16 @@
 ##! \alias{inla.link.invprobit}
 ##! \alias{inla.link.cloglog}
 ##! \alias{inla.link.invcloglog}
+##! \alias{inla.link.loglog}
+##! \alias{inla.link.invloglog}
 ##! \alias{inla.link.tan}
 ##! \alias{inla.link.invtan}
 ##! \alias{inla.link.identity}
 ##! \alias{inla.link.invidentity}
 ##! \alias{inla.link.invalid}
 ##! \alias{inla.link.invinvalid}
+##! \alias{inla.link.cauchit}
+##! \alias{inla.link.invcauchit}
 ##! 
 ##! \title{Link functions in INLA}
 ##! 
@@ -33,8 +39,12 @@
 ##! inla.link.invprobit(x, inverse=FALSE)
 ##! inla.link.cloglog(x, inverse=FALSE)
 ##! inla.link.invcloglog(x, inverse=FALSE)
+##! inla.link.loglog(x, inverse=FALSE)
+##! inla.link.invloglog(x, inverse=FALSE)
 ##! inla.link.tan(x, inverse=FALSE)
 ##! inla.link.invtan(x, inverse=FALSE)
+##! inla.link.cauchit(x, inverse=FALSE)
+##! inla.link.invcauchit(x, inverse=FALSE)
 ##! inla.link.identity(x, inverse=FALSE)
 ##! inla.link.invidentity(x, inverse=FALSE)
 ##! inla.link.invalid(x, inverse=FALSE)
@@ -53,6 +63,20 @@
 ##!       and so on,  but they are simpler to use a arguments
 ##!       to other functions.}
 ##! \author{Havard Rue \email{hrue@math.ntnu.no}}
+
+`inla.link.cauchit` = function(x, inverse = FALSE)
+{
+    if (!inverse) {
+        return (tan(pi * (x - 0.5)))
+    } else {
+        return (1.0/pi * atan(x) + 0.5)
+    }
+}
+`inla.link.invcauchit` = function(x, inverse = FALSE)
+{
+    return (inla.link.cauchit(x, inverse = !inverse))
+}
+
 
 `inla.link.log` = function(x, inverse = FALSE)
 {
@@ -93,12 +117,25 @@
     return (inla.link.probit(x, inverse = !inverse))
 }
 
-`inla.link.cloglog` = function(x, inverse = FALSE)
+`inla.link.loglog` = function(x, inverse = FALSE)
 {
     if (!inverse) {
         return (-log(-log(x)))
     } else {
         return (exp(-exp(-x)))
+    }
+}
+`inla.link.invloglog` = function(x, inverse = FALSE)
+{
+    return (inla.link.loglog(x, inverse = !inverse))
+}
+
+`inla.link.cloglog` = function(x, inverse = FALSE)
+{
+    if (!inverse) {
+        return (log(-log(1-x)))
+    } else {
+        return (1.0 - exp(-exp(x)))
     }
 }
 `inla.link.invcloglog` = function(x, inverse = FALSE)
@@ -118,6 +155,7 @@
 {
     return (inla.link.tan(x, inverse = !inverse))
 }
+
 `inla.link.identity` = function(x, inverse = FALSE)
 {
     return (x)

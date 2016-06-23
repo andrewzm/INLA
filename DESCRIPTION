@@ -1,12 +1,15 @@
 Package: INLA
 Type: Package
-Title: Functions which allow to perform full Bayesian analysis of latent Gaussian models using Integrated Nested Laplace Approximaxion
-Author: Havard Rue, Sara Martino, Finn Lindgren, Daniel Simpson, Andrea Riebler and Elias Teixeira Krainski
-Maintainer: Havard Rue <hrue@math.ntnu.no>, Finn Lindgren <finn.lindgren@gmail.com>,  Daniel Simpson <dp.simpson@gmail.com>, Andrea Riebler <andrea.riebler@math.ntnu.no> and Elias Teixeira Krainski <elias.krainski@math.ntnu.no>
+Title: Functions which Allow to Perform Full Bayesian Analysis of Latent Gaussian Models using Integrated Nested Laplace Approximations
+Author: Havard Rue, Sara Martino, Finn Lindgren, Daniel Simpson, Andrea Riebler, Elias Teixeira Krainski and Geir-Arne Fuglstad
+Maintainer: Havard Rue <hrue@math.ntnu.no>, Finn Lindgren <finn.lindgren@gmail.com>,  Daniel Simpson <dp.simpson@gmail.com>, Andrea Riebler <andrea.riebler@math.ntnu.no>, Elias Teixeira Krainski <elias.krainski@math.ntnu.no> and Geir-Arne Fuglstad <fulgstad@math.ntnu.no>
 Description: This package contains functions which allow to perform full Bayesian analysis of latent Gaussian models using Integrated Nested Laplace Approximaxion, and is a front-end to the inla-program.
 Depends: sp, Matrix, splines
-Suggests: numDeriv, Rgraphviz, graph, fields, rgl, mvtnorm, parallel, pixmap, splancs, orthopolynom, compiler
+Suggests: mvtnorm, numDeriv, Rgraphviz, graph, fields, rgl, parallel, pixmap, splancs, orthopolynom, compiler, devtools, knitr, markdown, shiny
+VignetteBuilder: knitr
+BuildVignettes: true
 ByteCompile: yes
+LazyData: true
 License: GPL (>= 2)
-Version: 0.0-1440400394
-Date: 2015-08-24 (hgid: 755a4114e167  date: Wed Aug 19 15:24:56 2015 +0200)
+Version: 0.0-1463562937
+Date: 2016-05-18 (hgid: 00b836f15490  date: Wed May 18 11:01:03 2016 +0200)

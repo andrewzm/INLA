@@ -17,8 +17,9 @@
         } else {
             suff = as.character(k-1L)
         }
-        cat(prefix, "initial",    suff, " = ", hyper[[k]]$initial, "\n", file = file, append = TRUE, sep="")
-        cat(prefix, "fixed",      suff, " = ", as.numeric(hyper[[k]]$fixed), "\n", file = file, append = TRUE, sep="")
+        cat(prefix, "initial", suff, " = ", hyper[[k]]$initial, "\n", file = file, append = TRUE, sep="")
+        cat(prefix, "fixed", suff, " = ", as.numeric(hyper[[k]]$fixed), "\n", file = file, append = TRUE, sep="")
+        cat(prefix, "hyperid", suff, " = ", as.numeric(hyper[[k]]$hyperid), "\n", file = file, append = TRUE, sep="")
 
         ## these are for "expression:"...
         ## if there are newlines,  remove them
@@ -44,7 +45,7 @@
             file.xy = inla.tempfile(tmpdir=data.dir)
             inla.write.fmesher.file(xy, filename = file.xy)
             file.xy = gsub(data.dir, "$inladatadir", file.xy, fixed=TRUE)
-            cat("prior", suff, " = table: ", file.xy, "\n", append=TRUE, sep = "", file = file)
+            cat(prefix, "prior", suff, " = table: ", file.xy, "\n", append=TRUE, sep = "", file = file)
         } else {
             cat(prefix, "prior", suff, " = ", tmp.prior, "\n", file = file, append = TRUE, sep="")
         }
@@ -58,9 +59,24 @@
         from.t = gsub("REPLACE.ME.high", paste("high=", as.numeric(high), sep=""), from.t)
         cat(prefix, "to.theta", suff, " = ", to.t, "\n", file = file, append = TRUE, sep="")
         cat(prefix, "from.theta", suff, " = ", from.t, "\n", file = file, append = TRUE, sep="")
+
+        ## do a second replacement so that we replace the functions with actual functions after
+        ## the replacement of REPLACE.ME.....
+        hyper[[k]]$from.theta = eval(parse(text = gsub("REPLACE.ME.ngroup", paste("ngroup=", as.integer(ngroup), sep=""),
+                                               inla.function2source(hyper[[k]]$from.theta, newline = ""))))
+        hyper[[k]]$from.theta = eval(parse(text = gsub("REPLACE.ME.low", paste("low=", as.numeric(low), sep=""),
+                                               inla.function2source(hyper[[k]]$from.theta, newline = ""))))
+        hyper[[k]]$from.theta = eval(parse(text = gsub("REPLACE.ME.high", paste("high=", as.numeric(high), sep=""),
+                                               inla.function2source(hyper[[k]]$from.theta, newline = ""))))
+        hyper[[k]]$to.theta = eval(parse(text= gsub("REPLACE.ME.low", paste("low=", as.numeric(low), sep=""),
+                                             inla.function2source(hyper[[k]]$to.theta, newline = ""))))
+        hyper[[k]]$to.theta = eval(parse(text= gsub("REPLACE.ME.high", paste("high=", as.numeric(high), sep=""),
+                                             inla.function2source(hyper[[k]]$to.theta, newline = ""))))
+        hyper[[k]]$to.theta = eval(parse(text= gsub("REPLACE.ME.ngroup", paste("ngroup=", as.integer(ngroup), sep=""),
+                                             inla.function2source(hyper[[k]]$to.theta, newline = ""))))
     }
 
-    return ()
+    return (hyper)
 }
 
 `inla.write.boolean.field` = function(tag, val, file)
@@ -95,6 +111,22 @@
     cat("variant = ",
         inla.ifelse(is.null(control$variant), 0L, as.integer(control$variant)),
         "\n", file = file,  append = TRUE)
+
+    if (inla.one.of(family, "cenpoisson")) {
+        if (is.null(control$cenpoisson.I)) {
+            interval = inla.set.control.family.default()$cenpoisson.I
+        } else {
+            ## must be integers
+            interval = round(control$cenpoisson.I)
+        }
+        if (length(interval) != 2L) {
+            stop(paste("cenpoisson.I: Must be a vector of length 2.", length(interval)))
+        }
+        if (interval[1] > interval[2]) {
+            stop(paste("cenpoisson.I = c(Low, High): Low > High!", interval[1],  interval[2]))
+        }
+        cat("cenpoisson.I = ", interval[1], " ",  interval[2], "\n", sep="", file=file, append=TRUE)
+    }
 
     if (inla.one.of(family, "laplace")) {
         ## two parameters, alpha and epsilon is require for LAPLACE
@@ -145,6 +177,23 @@
             stop(paste("For link-model:", lmod, ", the argument 'order' is not used and must be NULL."))
         }
     }
+
+    variant = control$control.link$variant
+    if (inla.one.of(lmod, c("logoffset"))) {
+        ## for these models, the argument 'variant' is required
+        if (## general
+            is.null(variant) ||
+            ## model-spesific
+            (inla.one.of(lmod, c("logoffset")) && all(variant != c(0, 1)))) {
+            stop(paste("For link-model:", lmod, ", the argument variant must be 0 or 1,  not", variant))
+        }
+        cat("link.variant = ", variant, "\n", file = file,  append = TRUE)
+    } else {
+        if (!is.null(variant)) {
+            stop(paste("For link-model:", lmod, ", the argument 'variant' is not used and must be NULL."))
+        }
+    }
+
     inla.write.hyper(control$control.link$hyper, file, prefix = "link.", data.dir = dirname(file))
     if (!is.null(link.covariates)) {
         if (!is.matrix(link.covariates)) {
@@ -218,10 +267,13 @@
         if (!is.null(random.spec$of)) {
             cat("of =", random.spec$of, "\n", sep = " ", file = file,  append = TRUE)
         }
+    }
+    if (inla.one.of(random.spec$model, c("copy", "sigm", "revsigm", "log1exp"))) {
         if (!is.null(random.spec$precision)) {
             cat("precision =", random.spec$precision, "\n", sep = " ", file = file,  append = TRUE)
         }
     }
+    
     if (inla.one.of(random.spec$model, c("clinear", "copy", "mec", "meb"))) {
         if (is.null(random.spec$range)) {
             ## default is the identity mapping
@@ -287,7 +339,7 @@
         low = random.spec$range[1]
         high = random.spec$range[2]
     }
-    inla.write.hyper(random.spec$hyper, file, data.dir = data.dir, ngroup = ngroup, low = low, high = high)
+    random.spec$hyper = inla.write.hyper(random.spec$hyper, file, data.dir = data.dir, ngroup = ngroup, low = low, high = high)
 
     if (inla.model.properties(random.spec$model, "latent")$nrow.ncol) {
         cat("nrow = ", random.spec$nrow, "\n", sep = " ", file = file,  append = TRUE)
@@ -321,13 +373,6 @@
                 ## 'order' is only used for model=ar
                 p = inla.ifelse(is.null(random.spec$control.group$order), 0, as.integer(random.spec$control.group$order))
                 cat("group.order = ", p, "\n", sep = " ", file = file,  append = TRUE)
-                ## set a default prior for order > 1 if the param is given only for p=1
-                par = random.spec$control.group$hyper$theta2$param
-                if (length(par) == 2L) {
-                    if (p > 1L) {
-                        random.spec$control.group$hyper$theta2$param = c(rep(par[1], p), par[2]*diag(p))
-                    }
-                }
             }
             if (inla.one.of(random.spec$control.group$model, "besag")) {
                 stopifnot(!is.null(random.spec$control.group$graph))
@@ -338,7 +383,9 @@
             } else {
                 stopifnot(is.null(random.spec$control.group$graph))
             }
-            inla.write.hyper(random.spec$control.group$hyper, file = file,  prefix = "group.", data.dir = data.dir, ngroup = ngroup)
+            random.spec$control.group$hyper = (inla.write.hyper(random.spec$control.group$hyper,
+                                                                file = file,  prefix = "group.",
+                                                                data.dir = data.dir, ngroup = ngroup))
         }
     }
         
@@ -537,11 +584,38 @@
     }
 
     if (random.spec$model == "rgeneric") {
-        cat("rgeneric.Id = ", random.spec$rgeneric$Id, "\n", append=TRUE, sep = " ", file = file)
-        stopifnot(!file.exists(random.spec$rgeneric$fifo$R2c))
-        stopifnot(!file.exists(random.spec$rgeneric$fifo$c2R))
-        cat("rgeneric.fifo.R2c = ", random.spec$rgeneric$fifo$R2c, "\n", append=TRUE, sep = " ", file = file)
-        cat("rgeneric.fifo.c2R = ", random.spec$rgeneric$fifo$c2R, "\n", append=TRUE, sep = " ", file = file)
+        file.rgeneric = inla.tempfile(tmpdir=data.dir)
+        ## this must be the same name as R_GENERIC_MODEL in inla.h
+        model = paste(".inla.rgeneric.model", ".", random.spec$rgeneric$Id, sep="")
+        assign(model, random.spec$rgeneric$model)
+        ## save model, or the object that 'model' expands to
+        inla.eval(paste("save(", model,
+                        ", file = ", "\"", file.rgeneric, "\"", 
+                        ", ascii = FALSE, compress = TRUE)",  sep=""))
+        fnm = gsub(data.dir, "$inladatadir", file.rgeneric, fixed=TRUE)
+        cat("rgeneric.file =", fnm, "\n", file=file, append = TRUE)
+        cat("rgeneric.model =", model, "\n", file=file, append = TRUE)
+        rm(model) ## do not need it anymore
+
+        if (!is.null(random.spec$rgeneric$R.init)) {
+            ## if the file exists, try to inla.load it. if its = save.image,  then save the
+            ## image and load it (later). otherwise,  interpret it as R-commands.
+            if (is.function(random.spec$rgeneric$R.init) &&
+                identical(random.spec$rgeneric$R.init, save.image)) {
+                tfile = tempfile()
+                save.image(file=tfile)
+                fnm = inla.copy.file.for.section(tfile, data.dir)
+                unlink(tfile)
+            } else if (file.exists(random.spec$rgeneric$R.init)) {
+                fnm = inla.copy.file.for.section(random.spec$rgeneric$R.init, data.dir)
+            } else {
+                tfile = tempfile()
+                cat(random.spec$rgeneric$R.init, "\n", file = tfile)
+                fnm = inla.copy.file.for.section(tfile, data.dir)
+                unlink(tfile)
+            }
+            cat("rgeneric.Rinit =", fnm, "\n", file=file, append = TRUE)
+        }
     }
             
     if (random.spec$model == "ar") {
@@ -552,8 +626,10 @@
         random.spec$correct = -1L  ## code for ``make the default choice''
     }
     cat("correct = ", as.numeric(random.spec$correct), "\n", append=TRUE, sep = "", file = file)
-
     cat("\n", sep = " ", file = file,  append = TRUE)
+
+    ## need to store the updated one
+    return (random.spec)
 }
 
 `inla.inla.section` = function(file, inla.spec)
@@ -665,7 +741,7 @@
         cat("step.len = ", inla.spec$step.len, "\n", sep = " ", file = file,  append = TRUE)
     }
     if (!is.null(inla.spec$stencil)) {
-        stopifnot(inla.spec$stencil %in% c(3, 5, 7))
+        stopifnot(inla.spec$stencil %in% c(3, 5, 7, 9))
         cat("stencil = ", inla.spec$stencil, "\n", sep = " ", file = file,  append = TRUE)
     }
     if (!is.null(inla.spec$diagonal) && inla.spec$diagonal >= 0.0) {
@@ -771,7 +847,6 @@
         ## Aextended = [ I, -A; -A^T, A^T A ] ((n+m) x (n+m))
         ##
         ## This matrix is the one that is needed for input to inla. 
-    
         if (is.character(predictor.spec$A)) {
             A = read.table(predictor.spec$A, col.names = c("i", "j", "x"))
             A = sparseMatrix(i = A$i, j = A$j, x = A$x, index1=TRUE)
@@ -784,8 +859,8 @@
         stopifnot(dim(A)[1] == m)
         stopifnot(dim(A)[2] == n)
 
-        ## replace NA's with zeros.
-        A[ is.na(A) ] = 0.0
+        ## replace NA's with zeros. (This is now done already in inla.R)
+        ## A[ is.na(A) ] = 0.0
 
         ## Aext = [ I, -A; -A^T, A^T A ] ((n+m) x (n+m))
         Aext = rBind(cBind(Diagonal(m), -A), cBind(-t(A), t(A) %*% A))
@@ -980,6 +1055,10 @@
             fnm = inla.copy.file.for.section(args$jp.Rfile, data.dir)
             cat("jp.Rfile = ", fnm, "\n", sep = " ", file = file,  append = TRUE)
         }
+        if (!is.null(args$jp.RData)) {
+            fnm = inla.copy.file.for.section(args$jp.RData, data.dir)
+            cat("jp.RData = ", fnm, "\n", sep = " ", file = file,  append = TRUE)
+        }
     }
     if (is.null(args$disable.gaussian.check)) {
         args$disable.gaussian.check = FALSE
@@ -1145,5 +1224,3 @@
     rprefix = paste(rdir, "/", file.prefix, sep="")
     return (rprefix)
 }
-
-

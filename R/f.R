@@ -196,7 +196,7 @@
     ##!CODE.
     ##!Name of the file containing the graph
     ##!of the model; see
-    ##!\url{http://www.r-inla.org/help/faq}.}
+    ##!\url{www.r-inla.org/faq}.}
     graph.file=NULL,
 
     ##!\item{cdf}{A vector of maximum 10 values between 0 and 1
@@ -278,7 +278,7 @@
     ##!\item{of}{TODO}
     of=NULL,
 
-    ##!\item{precision}{The precision for the artifical noise added when creating a copy of a model or the z-model.}
+    ##!\item{precision}{The precision for the artifical noise added when creating a copy of a model and others.}
     precision = 1.0e9,
 
     ##!\item{range}{A vector of size two giving the lower and
@@ -305,7 +305,7 @@
     ##!\item{strata}{A stratum vector. It meaning depends on the model.}
     strata = NULL, 
 
-    ##!\item{rgeneric}{A object of class \code{inla-rgeneric} which defines the model. (EXPERIMENTAL!)}
+    ##!\item{rgeneric}{A object of class \code{inla.rgeneric} which defines the model. (EXPERIMENTAL!)}
     rgeneric = NULL, 
 
     ##!\item{scale.model}{Logical. If \code{TRUE} then scale the RW1 and RW2 and BESAG and BYM and BESAG2 and RW2D models so the their (generlized) variance is 1. Default value is \code{inla.getOption("scale.model.default")}} 
@@ -881,11 +881,15 @@
     }
 
     if (model %in% "rgeneric") {
-        stopifnot(inherits(rgeneric, "inla-rgeneric"))
-        if (inla.os("windows")) {
-            stop("Model 'rgeneric' is not available for Windows; please use Linux or MacOSX. (No, there is no quick fix.)")
-        }
+        if (inla.is.element("f", rgeneric) && inla.is.element("rgeneric", rgeneric$f)) {
+            rgeneric = rgeneric$f$rgeneric
+        } 
+        R.init = rgeneric$R.init
+        stopifnot(inherits(rgeneric, "inla.rgeneric"))
+        ## add an 'Id' so we know who we are
+        rgeneric = list(model = rgeneric, Id = vars[[1]], R.init = R.init)
     }
+
 
     if (!missing(scale.model) && !inla.one.of(model, c("rw1", "rw2", "besag", "bym", "bym2", "besag2", "rw2d", "rw2diid"))) {
         stop("Option 'scale.model' is only used for models RW1 and RW2 and BESAG and BYM and BYM2 andBESAG2 and RW2D and RW2DIID.")
@@ -956,5 +960,6 @@
 `inla.model.object.classes` = function()
 {
     return (c("inla.model.class", "inla.wrapper.model",
-              "inla.spde", "inla.spde1", "inla.spde2", "inla.spde3"))
+              "inla.spde", "inla.spde1", "inla.spde2", "inla.spde3",
+              "inla.rgeneric"))
 }

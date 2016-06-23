@@ -50,7 +50,7 @@
 ##!    using \code{graph = inla.add.graph.cc(graph)} if you manually construct the \code{inla.graph}-object.
 ##!    Methods implemented for \code{inla.graph} are \code{summary} and \code{plot}.
 ##!    The method \code{plot} require the libraries \code{Rgraphviz} and \code{graph} from the Bioconductor-project,
-##!    see \url{http://www.bioconductor.org}.
+##!    see \url{https://www.bioconductor.org}.
 ##!}
 ##!\author{Havard Rue \email{hrue@math.ntnu.no}}
 ##!\seealso{
@@ -482,12 +482,12 @@
     inla.eval.dots(...)
 
     ## I add here some tools to view and summarize a such graphs...
-    inla.require("Rgraphviz") || stop("Need library 'Rgraphviz' from Bioconductor: see http://www.bioconductor.org")
-    inla.require("graph") || stop("Need library 'graph' from Bioconductor: see http://www.bioconductor.org")
+    inla.require("Rgraphviz") || stop("Need library 'Rgraphviz' from Bioconductor: see https://www.bioconductor.org")
+    inla.require("graph") || stop("Need library 'graph' from Bioconductor: see https://www.bioconductor.org")
 
     filter = match.arg(filter, filter.args)
     if (is.null(attrs)) {
-        attrs = getDefaultAttrs(layoutType = filter)
+        attrs = Rgraphviz::getDefaultAttrs(layoutType = filter)
     }
     if (!is.null(node.names)) {
         stopifnot(length(node.names) == x$n)
@@ -500,7 +500,7 @@
             j = x$nbs[[i]]
             j = j[j > i]
             if (length(j) > 0L) {
-                g = addEdge(node.names[i], node.names[j], g)
+                g = graph::addEdge(node.names[i], node.names[j], g)
             }
         }
     }

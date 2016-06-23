@@ -15,12 +15,10 @@
 ##! \alias{inla.rmarginal}
 ##! \alias{inla.hpdmarginal}
 ##! \alias{hpdmarginal}
-##! \alias{inla.expectation}
 ##! \alias{inla.emarginal}
 ##! \alias{emarginal}
 ##! \alias{inla.marginal.expectation}
 ##! \alias{marginal.expectation}
-##! \alias{inla.spline}
 ##! \alias{inla.smarginal}
 ##! \alias{smarginal}
 ##! \alias{inla.marginal.transform}
@@ -48,15 +46,15 @@
 ##! 
 ##! \usage{
 ##! inla.dmarginal(x, marginal, log = FALSE)
-##! inla.pmarginal(q, marginal, normalize = TRUE, len = 1024)
-##! inla.qmarginal(p, marginal, len = 1024)
+##! inla.pmarginal(q, marginal, normalize = TRUE, len = 1024L)
+##! inla.qmarginal(p, marginal, len = 1024L)
 ##! inla.rmarginal(n, marginal)
-##! inla.hpdmarginal(p, marginal, len = 1024)
-##! inla.smarginal(marginal, log = FALSE, extrapolate = 0.0, keep.type = FALSE, factor=10L)
+##! inla.hpdmarginal(p, marginal, len = 1024L)
+##! inla.smarginal(marginal, log = FALSE, extrapolate = 0.0, keep.type = FALSE, factor=15L)
 ##! inla.emarginal(fun, marginal, ...)
 ##! inla.mmarginal(marginal)
-##! inla.tmarginal(fun, marginal, n=1024, h.diff = .Machine$double.eps^(1/3),
-##!                method = c("quantile", "linear"),  ...) 
+##! inla.tmarginal(fun, marginal, n=1024L, h.diff = .Machine$double.eps^(1/3),
+##!                method = c("quantile", "linear"),  disable.numDeriv = FALSE, ...) 
 ##! inla.zmarginal(marginal, silent = FALSE)
 ##! }
 ##! \arguments{
@@ -105,6 +103,8 @@
 ##!                 which is argument \code{n} in \code{spline}}
 ##!   
 ##!    \item{method}{Which method should be used to layout points for where the transformation is computed.}
+##!
+##!    \item{disable.numDeriv}{Disable the use of library \code{numDeriv}.}
 ##!
 ##!    \item{silent}{Output the result visually (TRUE) or just through the call.}
 ##! }
@@ -177,7 +177,8 @@
     ## density is to small compared to the maximum density. (othewise
     ## we can get trouble with the spline interpolation). same with
     ## 'x'? No...
-    eps = sqrt(.Machine$double.eps)
+    eps = .Machine$double.eps * 1000
+    ##marginal = spline(marginal)
     if (is.matrix(marginal)) {
         i = (marginal[, 2] > 0) & (abs(marginal[, 2]/max(marginal[, 2])) > eps)
         m = list(x=marginal[i, 1], y=marginal[i, 2])
@@ -193,11 +194,20 @@
     return (m)
 }
 
-`inla.spline` = function(marginal, log = FALSE, extrapolate = 0.0, factor = 10L) {
-    return (inla.smarginal(marginal, log, extrapolate, factor))
+`inla.spline` = function(x, ...)
+{
+    s = spline(x, ...)
+    if (is.matrix(x)) {
+        m = cbind(x = s$x, y = s$y)
+    } else if (is.list(x)) {
+        m = list(x = s$x, y = s$y)
+    } else {
+        m = s
+    }
+    return (m)
 }
 
-`inla.smarginal` = function(marginal, log = FALSE, extrapolate = 0.0, keep.type = FALSE, factor=10L)
+`inla.smarginal` = function(marginal, log = FALSE, extrapolate = 0.0, keep.type = FALSE, factor=15L)
 {
     ## for marginal in matrix MARGINAL, which is a marginal density,
     ## return the nice interpolated (x, y) where the interpolation is
@@ -206,12 +216,27 @@
     is.mat = is.matrix(marginal)
     m = inla.marginal.fix(marginal)
     r = diff(range(m$x))
-    ans = spline(m$x, log(m$y), xmin = min(m$x) - extrapolate * r, xmax = max(m$x) + extrapolate * r,
-            n = factor*length(m$x),  method = "natural")
+    xmin = min(m$x) - extrapolate * r
+    xmax = max(m$x) + extrapolate * r
+    n = factor * length(m$x)
+    xx = seq(xmin, xmax, len = n)
+    if (extrapolate) {
+        xx = c(xmin, m$x, xmax)
+    } else {
+        xx = m$x
+    }
+    nx = length(xx)
+    dx = nx * diff(xx) / median(diff(xx))
+    xnew = c(0, cumsum(sqrt(dx)))
+    xnew = xmin + (xmax - xmin) * ((xnew - min(xnew))/(max(xnew) - min(xnew)))
+    fun = splinefun(xnew, xx, method = "hyman")
+    fun.inv = splinefun(xx, xnew, method = "hyman")
+    ans = spline(fun.inv(m$x), log(m$y), xmin = fun.inv(xmin), xmax = fun.inv(xmax), n = n, method = "fmm")
+    ans$x = fun(ans$x)
     if (!log) {
         ans$y = exp(ans$y)
+        ans = inla.marginal.fix(ans)
     }
-
     if (is.mat && keep.type) {
         return (cbind(ans$x, ans$y))
     } else {
@@ -229,10 +254,6 @@
     return (list(range = r, fun = splinefun(m$x, log(m$y))))
 }
 
-`inla.expectation` = function(fun, marginal, ...) {
-    return (inla.emarginal(fun, marginal, ...))
-}
-
 `inla.emarginal` = function(fun, marginal, ...)
 {
     ## compute E(FUN(x)), where the marginal of x is given in
@@ -241,16 +262,21 @@
 
     xx = inla.smarginal(marginal)
     n = length(xx$x)
-    if (n%%2 == 0)
+    if (n%%2 == 0) {
         n = n -1
-
+        xx$x = xx$x[1:n]
+        xx$y = xx$y[1:n]
+    }
+    
     ## use Simpsons integration rule
     i.0 = c(1, n)
     i.4 = seq(2, n-1, by=2)
     i.2 = seq(3, n-2, by=2)
 
+    dx = diff(xx$x)
+    dx = 0.5 * (c(dx, 0) + c(0, dx))
     fun = match.fun(fun)
-    ff = fun(xx$x[1:n], ...) * xx$y[1:n]
+    ff = fun(xx$x[1:n], ...) * xx$y[1:n] * dx
     nf = length(ff) %/% n
     e = numeric(nf)
     off = 0L
@@ -260,7 +286,7 @@
     }
 
     ## normalise, so that E(1) = 1
-    ff = 1 * xx$y[1:n] 
+    ff = dx * xx$y[1:n] 
     e.1 = sum(sum(ff[i.0]) + 4*sum(ff[i.4]) + 2*sum(ff[i.2]))
 
     return (e/e.1)
@@ -294,7 +320,7 @@
     return (d)
 }
 
-`inla.pmarginal` = function(q, marginal, normalize = TRUE, len = 1024)
+`inla.pmarginal` = function(q, marginal, normalize = TRUE, len = 1024L)
 {
     f = inla.sfmarginal(inla.smarginal(marginal))
     xx = seq(f$range[1], f$range[2], length = len)
@@ -302,7 +328,7 @@
     d = d/d[length(d)]
 
     ## just spline-interpolate the mapping
-    fq = splinefun(xx, d, method = "monoH.FC")
+    fq = splinefun(xx, d, method = "hyman")
 
     ## just make sure the p's are in [0, 1]
     n = length(q)
@@ -311,7 +337,7 @@
     return (fq(xx))
 }
 
-`inla.qmarginal` = function(p, marginal, len = 1024)
+`inla.qmarginal` = function(p, marginal, len = 1024L)
 {
     f = inla.sfmarginal(inla.smarginal(marginal))
     xx = seq(f$range[1], f$range[2], length = len)
@@ -332,7 +358,7 @@
     }
 
     ## just spline-interpolate the inverse mapping
-    fq = splinefun(d, xx, method = "monoH.FC")
+    fq = splinefun(d, xx, method = "hyman")
 
     ## just make sure the p's are in [0, 1]
     n = length(p)
@@ -340,7 +366,7 @@
 
     return (fq(pp))
 }
-`inla.hpdmarginal` = function(p, marginal, len = 2048L)
+`inla.hpdmarginal` = function(p, marginal, len = 1024L)
 {
     sm = inla.smarginal(marginal, keep.type = FALSE)
     f = inla.sfmarginal(sm)
@@ -367,7 +393,7 @@
         }
     }
     ## just spline-interpolate the inverse mapping
-    fq = splinefun(d, xx, method = "monoH.FC")
+    fq = splinefun(d, xx, method = "hyman")
 
     ## just make sure the p's are in [0, 1]
     np = length(p)
@@ -379,6 +405,7 @@
     }
 
     tol= sqrt(.Machine$double.eps)
+    tol = 1E-6
     result = matrix(NA, np, 2)
     for(i in 1:np) {
         out = optimize(f, c(0, pp[i]), posterior.icdf = fq, conf = pp[i], tol = tol)
@@ -397,14 +424,14 @@
     return (inla.qmarginal(runif(n), marginal))
 }
 
-`inla.marginal.transform` = function(fun, marginal, n=1024, h.diff = .Machine$double.eps^(1/3),
+`inla.marginal.transform` = function(fun, marginal, n=1024L, h.diff = .Machine$double.eps^(1/3),
         method = c("quantile", "linear"),  ...)
 {
     return (inla.tmarginal(fun, marginal, n, h.diff, method = method, ...))
 }
 
-`inla.tmarginal` = function(fun, marginal, n=1024, h.diff = .Machine$double.eps^(1/3),
-        method = c("quantile", "linear"),  ...) 
+`inla.tmarginal` = function(fun, marginal, n=1024L, h.diff = .Machine$double.eps^(1/3),
+        method = c("quantile", "linear"), disable.numDeriv = FALSE, ...) 
 {
     f = match.fun(fun)
     ff = function(x) f(x, ...)
@@ -423,18 +450,13 @@
     }
     xx = ff(x)
 
-    ## use the numDeriv library if present
-    present = inla.require("numDeriv")
-
-    if (present) {
-        ## using numDeriv
+    if (inla.require("numDeriv") && !disable.numDeriv) {
         dif = numeric(length(x))
         for(i in 1:length(x)) {
             dif[i] = numDeriv::grad(ff, x[i])
         }
         log.dens = inla.dmarginal(x, marginal, log=FALSE)/ abs(dif)
     } else {
-        ## use a simple algorithm
         log.dens = inla.dmarginal(x, marginal, log=FALSE)/
             abs((ff(x + h.diff) - ff(x-h.diff))/(2*h.diff))
     }
