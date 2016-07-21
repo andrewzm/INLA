@@ -15,10 +15,12 @@
  \alias{inla.rmarginal}
  \alias{inla.hpdmarginal}
  \alias{hpdmarginal}
+ \alias{inla.expectation}
  \alias{inla.emarginal}
  \alias{emarginal}
  \alias{inla.marginal.expectation}
  \alias{marginal.expectation}
+ \alias{inla.spline}
  \alias{inla.smarginal}
  \alias{smarginal}
  \alias{inla.marginal.transform}
@@ -46,15 +48,15 @@
  
  \usage{
  inla.dmarginal(x, marginal, log = FALSE)
- inla.pmarginal(q, marginal, normalize = TRUE, len = 1024L)
- inla.qmarginal(p, marginal, len = 1024L)
+ inla.pmarginal(q, marginal, normalize = TRUE, len = 1024)
+ inla.qmarginal(p, marginal, len = 1024)
  inla.rmarginal(n, marginal)
- inla.hpdmarginal(p, marginal, len = 1024L)
- inla.smarginal(marginal, log = FALSE, extrapolate = 0.0, keep.type = FALSE, factor=15L)
+ inla.hpdmarginal(p, marginal, len = 1024)
+ inla.smarginal(marginal, log = FALSE, extrapolate = 0.0, keep.type = FALSE, factor=10L)
  inla.emarginal(fun, marginal, ...)
  inla.mmarginal(marginal)
- inla.tmarginal(fun, marginal, n=1024L, h.diff = .Machine$double.eps^(1/3),
-                method = c("quantile", "linear"),  disable.numDeriv = FALSE, ...) 
+ inla.tmarginal(fun, marginal, n=1024, h.diff = .Machine$double.eps^(1/3),
+                method = c("quantile", "linear"),  ...) 
  inla.zmarginal(marginal, silent = FALSE)
  }
  \arguments{
@@ -103,8 +105,6 @@
                  which is argument \code{n} in \code{spline}}
    
     \item{method}{Which method should be used to layout points for where the transformation is computed.}
-
-    \item{disable.numDeriv}{Disable the use of library \code{numDeriv}.}
 
     \item{silent}{Output the result visually (TRUE) or just through the call.}
  }

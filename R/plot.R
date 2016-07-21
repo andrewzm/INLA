@@ -16,13 +16,10 @@
 ##!              plot.predictor = TRUE,
 ##!              plot.q = TRUE,
 ##!              plot.cpo = TRUE,
-##!              plot.prior = FALSE, 
 ##!              single = FALSE,
 ##!              postscript = FALSE,
 ##!              pdf = FALSE,
 ##!              prefix = "inla.plots/figure-",
-##!              intern = FALSE, 
-##!              debug = FALSE, 
 ##!              ...)
 ##! }
 ##! \arguments{
@@ -39,14 +36,11 @@
 ##!     for the linear predictor in the model should be plotted }
 ##!   \item{plot.q}{Boolean indicating if precision matrix should be displayed}
 ##!   \item{plot.cpo}{Boolean indicating if CPO/PIT valuesshould be plotted}
-##!   \item{plot.prior}{Plot also the prior density for the hyperparameters}
 ##!   \item{single}{Boolean indicating if there should be more than one plot per page
 ##!                 (FALSE) or just one (TRUE)}
 ##!   \item{postscript}{Boolean indicating if postscript files should be produced instead}
 ##!   \item{pdf}{Boolean indicating if PDF files should be produced instead}
 ##!   \item{prefix}{The prefix for the created files. Additional numbering and suffix is added.}
-##!   \item{intern}{Plot also the hyperparameters in its internal scale.}
-##!   \item{debug}{Write some debug information}
 ##!   \item{...}{Additional arguments to \code{postscript()}, \code{pdf()} or \code{dev.new()}.}
 ##! }
 ##! \value{The return value is a list of the files created (if any).}
@@ -71,21 +65,14 @@
              plot.predictor = TRUE,
              plot.q = TRUE,
              plot.cpo = TRUE,
-             plot.prior = FALSE, 
              single = FALSE,
              postscript = FALSE,
              pdf = FALSE,
              prefix = "inla.plots/figure-",
-             intern = FALSE, 
-             debug = FALSE, 
              ...)
 {
     figure.count = 1L
     figures = c()
-
-    if (plot.prior) {
-        all.hyper = inla.all.hyper.postprocess(x$all.hyper)
-    }
 
     if (postscript && pdf) {
         stop("Only one of 'postscript' and 'pdf' can be generated at the time.")
@@ -180,16 +167,8 @@
                 if (!all(is.na(fix[[i]]))) {
                     ss = x$summary.fixed[i,]
                     sub=paste("Mean = ", round(ss[names(ss)=="mean"], 3)," SD = ", round(ss[names(ss)=="sd"], 3), sep="")
-                    m = inla.smarginal(fix[[i]])
-                    plot(m, type="l", main=paste("PostDens [", inla.nameunfix(labels.fix[i]),"]", sep=""),
+                    plot(inla.smarginal(fix[[i]]), type="l", main=paste("PostDens [", inla.nameunfix(labels.fix[i]),"]", sep=""),
                          sub=sub, xlab="", ylab="")
-
-                    if (plot.prior) {
-                        xy = (inla.get.prior.xy(section = "fixed", hyperid = labels.fix[i],
-                                                all.hyper = all.hyper, range = range(m$x), debug = debug))
-                        lines(xy, lwd = 1, col = "blue")
-                    }
-
                 }
             }
         }
@@ -414,7 +393,6 @@
             }
         }
     }
-
     if (plot.hyperparameters) {
         hyper = x$marginals.hyperpar
         if (!is.null(hyper)) {
@@ -440,62 +418,8 @@
                 hh = hyper[[i]]
                 if (!is.null(hh)) {
                     label = inla.nameunfix(names(hyper)[i])
-                    m = inla.smarginal(hh)
-                    plot(m, type="l", ylab="", xlab="")
+                    plot(inla.smarginal(hh), type="l", ylab="", xlab="")
                     title(main=paste("PostDens [", label, "]", sep=""))
-
-                    if (plot.prior) {
-                        id = unlist(strsplit(attr(hyper[[i]], "hyperid"), "\\|"))
-                        if (length(id) > 0) {
-                            xy = (inla.get.prior.xy(section = tolower(id[2]), hyperid = id[1],
-                                                    all.hyper = all.hyper, range = range(m$x), intern = FALSE,
-                                                    debug = debug))
-                            lines(xy, lwd = 1, col = "blue")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (plot.hyperparameters && intern) {
-        hyper = x$internal.marginals.hyperpar
-        if (!is.null(hyper)) {
-            nhyper = length(hyper)
-
-            if (nhyper == 1 || single) {
-                plot.layout = c(1, 1)
-            } else if (nhyper == 2) {
-                plot.layout = c(2, 1)
-            } else {
-                plot.layout = c(3, 3)
-            }
-            np = prod(plot.layout)
-
-            ip = 0
-            for(i in 1:nhyper) {
-                if (ip%%np == 0) {
-                    close.and.new.plot(...)
-                    par(mfrow=c(plot.layout[1], plot.layout[2]))
-                }
-                ip = ip + 1
-
-                hh = hyper[[i]]
-                if (!is.null(hh)) {
-                    label = inla.nameunfix(names(hyper)[i])
-                    m = inla.smarginal(hh)
-                    plot(m, type="l", ylab="", xlab="")
-                    title(main=paste("PostDens [", label, "]", sep=""))
-
-                    if (plot.prior) {
-                        id = unlist(strsplit(attr(hyper[[i]], "hyperid"), "\\|"))
-                        if (length(id) > 0) {
-                            xy = (inla.get.prior.xy(section = tolower(id[2]), hyperid = id[1], 
-                                                    all.hyper = all.hyper, range = range(m$x), intern = TRUE,
-                                                    debug = debug))
-                            lines(xy, lwd = 1, col = "blue")
-                        }
-                    }
                 }
             }
         }
@@ -587,7 +511,6 @@
             }
         }
     }
-
     if (plot.q && !is.null(x$Q)) {
         close.and.new.plot(...)
         if (single) {
@@ -611,7 +534,6 @@
             lines(c(0, nx, nx, 0, 0), c(0, 0, nx, nx, 0), lwd=2)
         }
     }
-
     if (plot.cpo && !is.null(x$cpo)) {
         if (!(is.null(x$cpo$pit) || length(x$cpo$pit) == 0L) || !(is.null(x$cpo$cpo) || length(x$cpo$cpo) == 0L)) {
             close.and.new.plot(...)
@@ -662,387 +584,4 @@
 
     close.plot(...)
     return (invisible(figures))
-}
-
-inla.extract.prior = function(section = NULL, hyperid = NULL, all.hyper, debug=FALSE)
-{
-    str.trunc = function(..., max.len = 32)
-    {
-        str = paste(..., sep="", collapse = " ")
-        str = substr(str, 1, min(max.len, nchar(str)))
-        return(str)
-    }
-
-    output = function(..., warning=FALSE, force = FALSE)
-    {
-        msg = paste("*** inla.extract.prior: ", ..., sep="", collapse=" ")
-        if (warning) warning(msg)
-        if (debug || force) print(msg)
-        return (invisible())
-    }
-    
-    if (section == "fixed") {
-        ## hyperid = name of fixed effect
-        output("enter section [fixed]")
-        output("searching for hyperid = ", hyperid)
-        h = all.hyper$fixed
-        found = FALSE
-        for(i in seq_along(h)) {
-            ## output("search for label = ", h[[i]]$label)
-            if (inla.strcasecmp(h[[i]]$label, hyperid)) {
-                found = TRUE
-                break
-            }
-        }
-        if (found) {
-            prior = "gaussian"
-            param = c(h[[i]]$prior.mean, h[[i]]$prior.prec)
-            from.theta = function(x) x
-            to.theta = function(x) x
-        } else {
-            ## try section 'linear' instead
-            output("enter section [linear]")
-            output("searching for hyperid = ", hyperid)
-            h = all.hyper$linear
-            found = FALSE
-            for(i in seq_along(h)) {
-                ## output("search for label = ", h[[i]]$label)
-                if (inla.strcasecmp(h[[i]]$label, hyperid)) {
-                    found = TRUE
-                    break
-                }
-            }
-            if (!found) {
-                output(paste("cannot find hyperid '", hyperid,
-                             "' in sections 'fixed' and 'linear'.",  sep=""), warning = TRUE)
-                return (NA)
-            }
-            prior = "gaussian"
-            param = c(h[[i]]$prior.mean, h[[i]]$prior.prec)
-            from.theta = function(x) x
-            to.theta = function(x) x
-        }
-    } else if (section == "predictor") {
-        output("section predictor")
-        h = all.hyper$predictor
-        stopifnot(length(h) == 1)
-        stopifnot(inla.strcasecmp(as.character(h[[1]]$theta$hyperid), hyperid))
-        prior = h[[1]]$theta$prior
-        param = h[[1]]$theta$param
-        from.theta = h[[1]]$theta$from.theta
-        to.theta = h[[1]]$theta$to.theta
-    } else if (length(grep("^inla.data[0-9]+$", section)) > 0) {
-        ## likelihood
-        output("request for likelihood ", section, " with hyperid ",  hyperid)
-        h = all.hyper$family
-        found = FALSE
-        for (idx.family in seq_along(h)) {
-            if (inla.strcasecmp(section, h[[idx.family]]$hyperid)) {
-                found = TRUE
-                break
-            }
-        }
-        if (!found) {
-            output("likelihood ",  section, " with hyperid ", hyperid,  " is not found", warning=TRUE)
-            return (NA)
-        } else {
-            output("likelihood ",  section, " with hyperid ", hyperid,  " is found with idx.family=", idx.family)
-        }
-
-        ## now we need to find the theta
-        found = FALSE
-        for (idx.theta in seq_along(h[[idx.family]]$hyper)) {
-            if (inla.strcasecmp(hyperid, h[[idx.family]]$hyper[[idx.theta]]$hyperid)) {
-                found = TRUE
-                break
-            }
-        }
-        if (found) {
-            output("likelihood ",  section, " with hyperid ", hyperid,  ". theta is found with idx.theta=", idx.theta)
-            prior = h[[idx.family]]$hyper[[idx.theta]]$prior
-            param = h[[idx.family]]$hyper[[idx.theta]]$param
-            from.theta = h[[idx.family]]$hyper[[idx.theta]]$from.theta
-            to.theta = h[[idx.family]]$hyper[[idx.theta]]$to.theta
-        } else {
-            ## look in the link-section for theta
-            found = FALSE
-            for (idx.theta in seq_along(h[[idx.family]]$link$hyper)) {
-                if (inla.strcasecmp(hyperid, h[[idx.family]]$link$hyper[[idx.theta]]$hyperid)) {
-                    found = TRUE
-                    break
-                }
-            }
-            if (found) {
-                output("likelihood ",  section, " with hyperid ", hyperid,  ". theta is found with idx.theta=", idx.theta)
-                prior = h[[idx.family]]$link$hyper[[idx.theta]]$prior
-                param = h[[idx.family]]$link$hyper[[idx.theta]]$param
-                from.theta = h[[idx.family]]$link$hyper[[idx.theta]]$from.theta
-                to.theta = h[[idx.family]]$link$hyper[[idx.theta]]$to.theta
-            } else {
-                output("likelihood ",  section, " with hyperid ", hyperid,  ". theta is not found",
-                       warning = TRUE)
-                return (NA)
-            }
-        }
-    } else {
-        ## random
-        output("request for random ", section, " with hyperid ",  hyperid)
-        h = all.hyper$random
-        found = FALSE
-        for (idx.random in seq_along(h)) {
-            if (inla.strcasecmp(section, h[[idx.random]]$hyperid)) {
-                found = TRUE
-                break
-            }
-        }
-        if (!found) {
-            output("random ",  section, " with hyperid ", hyperid,  " is not found", warning = TRUE)
-            return (NA)
-        } else {
-            output("random ",  section, " with hyperid ", hyperid,  " is found with idx.random=", idx.random)
-        }
-
-        ## now we need to find the theta
-        found = FALSE
-        for (idx.theta in seq_along(h[[idx.random]]$hyper)) {
-            if (inla.strcasecmp(hyperid, h[[idx.random]]$hyper[[idx.theta]]$hyperid)) {
-                found = TRUE
-                break
-            }
-        }
-        hyper = h[[idx.random]]$hyper
-        if (!found) {
-            for (idx.theta in seq_along(h[[idx.random]]$group.hyper)) {
-                if (inla.strcasecmp(hyperid, h[[idx.random]]$group.hyper[[idx.theta]]$hyperid)) {
-                    found = TRUE
-                    break
-                }
-            }
-            hyper = h[[idx.random]]$group.hyper
-            if (!found) {
-                output("random ",  section, " with hyperid ", hyperid,  ". theta is not found",
-                       warning = TRUE)
-                return (NA)
-            } else {
-                output("random ",  section, " with hyperid ", hyperid,  ". theta is found with (group) idx.theta=", idx.theta)
-            }
-        } else {
-            output("random ",  section, " with hyperid ", hyperid,  ". theta is found with idx.theta=", idx.theta)
-        }
-        prior = hyper[[idx.theta]]$prior
-        param = hyper[[idx.theta]]$param
-        from.theta = hyper[[idx.theta]]$from.theta
-        to.theta = hyper[[idx.theta]]$to.theta
-    }
-
-    output("prior ",  str.trunc(prior), " param ",  str.trunc(param))
-    return (list(prior = prior, param = param, from.theta = from.theta, to.theta = to.theta))
-
-}
-
-inla.get.prior.xy = function(section = NULL, hyperid = NULL, all.hyper, debug=FALSE,
-    len = 1000, range, intern = FALSE)
-{
-    str.trunc = function(..., max.len = 32)
-    {
-        str = paste(..., sep="", collapse = " ")
-        str = substr(str, 1, min(max.len, nchar(str)))
-        return(str)
-    }
-        
-    output = function(..., stop=FALSE, force = FALSE)
-    {
-        msg = paste("*** inla.get.prior.xy: ", ..., sep="", collapse=" ")
-        if (stop) stop(msg)
-        if (debug || force) print(msg)
-        return (invisible())
-    }
-
-    ## add priors here. the format is
-    ##
-    ## my.<NameOfPrior> = function(theta, param, log=FALSE)
-    ##
-    ## and should return the density (log=F) or log-density (log=T) for the internal parameter
-    ## THETA (which is a vector), and the prior has parameters PARAM (which is the same ones as
-    ## specified from within the R-interface and argument 'hyper'. the conversion to the prior
-    ## density for the user-scale is done automatically.
-
-    my.pc.cor0 = function(theta, param, log = FALSE)
-    {
-        e.theta = exp(theta)
-        rho = 2.0 * e.theta/(1 + e.theta) - 1.0
-        ld = (inla.pc.dcor0(rho, u = param[1], alpha = param[2], log=TRUE) +
-              log(2) + theta - 2.0*log(1+e.theta))
-        return (if (log) ld else exp(ld))
-    }
-
-    my.pc.rho0 = function(theta, param, log = FALSE)
-    {
-        return (my.pc.cor0(theta, param, log))
-    }
-
-    my.pc.cor1 = function(theta, param, log = FALSE)
-    {
-        e.theta = exp(theta)
-        rho = 2.0 * e.theta/(1 + e.theta) - 1.0
-        ld = (inla.pc.dcor1(rho, u = param[1], alpha = param[2], log=TRUE) +
-              log(2) + theta - 2.0*log(1+e.theta))
-        return (if (log) ld else exp(ld))
-    }
-
-    my.pc.rho1 = function(theta, param, log = FALSE)
-    {
-        return (my.pc.cor1(theta, param, log))
-    }
-
-    my.logitbeta = function(theta, param, log=FALSE)
-    {
-        e.theta = exp(theta)
-        p = e.theta/(1.0 + e.theta)
-        ld = (dbeta(p, shape1 = param[1], shape2 = param[2], log=TRUE) +
-              theta - 2.0 * log(1 + e.theta))
-        return (if (log) ld else exp(ld))
-    }
-
-    my.betacorrelation = function(theta, param, log=FALSE)
-    {
-        print(param)
-        e.theta = exp(theta)
-        p = e.theta/(1 + e.theta)
-        ld = dbeta(p, shape1 = param[1], shape2 = param[2], log=TRUE) +
-            theta - 2.0 * log(1.0 + e.theta)
-        return (if (log) ld else exp(ld))
-    }
-
-    my.pc.prec = function(theta, param, log=FALSE)
-    {
-        ## sigma = exp(-theta/2)
-        ## pi(theta) = lambda * exp(-lambda*sigma) * sigma/2
-        ## param = c(U, alpha)
-        lambda = -log(param[2])/param[1]
-        sigma = exp(-theta/2.0)
-        ld = log(lambda) + (-theta/2.0) - log(2.0) - lambda * sigma
-        return (if (log) ld else exp(ld))
-    }
-
-    my.loggamma = function(theta, param, log=FALSE)
-    {
-        ## the log-of-a-gamma(a, b) density
-        ld = dgamma(exp(theta), shape = param[1], rate = param[2], log=TRUE) + theta
-        return (if (log) ld else exp(ld))
-    }
-
-    my.gaussian = function(theta, param, log=FALSE)
-    {
-        if (param[2] == 0) ## improper prior
-            param[2] = 1.0/.Machine$double.eps
-        ld = dnorm(theta, mean = param[1], sd = sqrt(1/param[2]), log=TRUE)
-        return (if (log) ld else exp(ld))
-    }
-            
-    my.normal = function(theta, param, log=FALSE)
-    {
-        return (my.gaussian(theta, param, log))
-    }
-
-    my.table = function(theta, param, log=FALSE)
-    {
-        fun = splinefun(param[, 1], param[, 2])
-        ld = fun(theta)
-        return (if (log) ld else exp(ld))
-    }
-        
-    ## end of prior functions
-
-    stopifnot(!missing(range))
-    prior = inla.extract.prior(section, hyperid, all.hyper, debug)
-
-    if (length(prior) == 1 && is.na(prior)) {
-        return (list(x = NA, y = NA))
-    } 
-
-    if (length(grep("table:", prior$prior)) > 0) {
-        tab = substr(prior$prior, nchar("table:")+1, nchar(prior$prior))
-        xy = as.numeric(unlist(strsplit(tab, "[ \t\n\r]+")))
-        xy = xy[!is.na(xy)]
-        nxy = length(xy) %/% 2L
-        xx = xy[1:nxy]
-        yy = xy[1:nxy + nxy]
-        xy = cbind(xx, yy)
-        prior$param = xy
-        prior$prior = "table"
-    }
-    if (length(grep("expression:", prior$prior)) > 0) {
-        ## not available yet.
-        return (list(x = NA, y = NA))
-    }
-
-    myp = paste("my.", prior$prior, sep="")
-    if (!exists(myp) || !is.function(eval(parse(text = myp)))) {
-        output("internal prior-function not found: ", myp, ", NEEDS TO BE IMPLEMENTED", force=TRUE)
-        return (list(x = NA, y=NA))
-    }
-    output("prior: ", str.trunc(prior$prior), " param: ", str.trunc(prior$param))
-
-    if (intern) {
-        ## use a linear scale. 'x' is in the linear scale
-        x = seq(range[1], range[2], len = len)
-        y = do.call(myp, list(theta=x, param = prior$param))
-    } else {
-        ## 'x' is in the user-scale.
-        range.theta = prior$to.theta(range)
-        theta = seq(range.theta[1], range.theta[2], len = len)
-        x = prior$from.theta(theta)
-        ld = do.call(myp, args = list(theta = theta, param = prior$param, log=TRUE))
-        fun = splinefun(x, theta)
-        y = exp(ld + log(abs(fun(x, deriv=1))))
-    }
-    return (list(x = x, y = y))
-}
-
-`inla.all.hyper.postprocess` = function(all.hyper)
-{
-    ## postprocess all.hyper, by converting and replacing prior = 'mvnorm' into its p
-    ## marginals. this is for the spde-models
-
-    len.n = function(param, max.dim = 10000)
-    {
-        len = function(n) {
-            return (n + n^2)
-        }
-
-        len.target = length(param)
-        for(n in 1:max.dim) {
-            if (len(n) == len.target) {
-                return (n)
-            }
-        }
-        stop(paste("length(param) is wrong:", len.target))
-    }
-
-    get.mvnorm.marginals = function(param)
-    {
-        n = len.n(param)
-        mu = param[1:n]
-        Q = matrix(param[-(1:n)], n, n)
-        Sigma = solve((Q + t(Q))/2.)
-        return (list(mean = mu, prec = 1/diag(Sigma)))
-    }
-    
-    for (i in seq_along(all.hyper$random)) {
-        for(j in seq_along(all.hyper$random[[i]]$hyper)) {
-
-            if (all.hyper$random[[i]]$hyper[[j]]$prior == "mvnorm") {
-                ## replace this one, and the p-following ones, with its marginals
-                m = get.mvnorm.marginals(all.hyper$random[[i]]$hyper[[j]]$param)
-                for(k in 1:length(m$mean)) {
-                    kk = j + k - 1
-                    all.hyper$random[[i]]$hyper[[kk]]$prior = "normal"
-                    all.hyper$random[[i]]$hyper[[kk]]$param = c(m$mean[k], m$prec[k])
-                }
-            }
-        }
-    }
-
-    return (all.hyper)
 }

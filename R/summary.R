@@ -12,16 +12,14 @@
 ##!
 ##!}
 ##!\usage{
-##!\method{summary}{inla}(object, ..., digits = 4L, include.lincomb = TRUE)
-##!\method{print}{summary.inla}(x, ...)
+##!\method{summary}{inla}(object,...)
+##!\method{print}{summary.inla}(x,...)
 ##!}
 ##!%- maybe also 'usage' for other objects documented here.
 ##!\arguments{
 ##!  \item{object}{  a fitted \code{inla} object as produced by
 ##!    \code{inla}.}
-##!  \item{x}{a \code{summary.inla} object produced by \code{summary.inla}}
-##!  \item{digits}{Integer Number of digits}
-##!  \item{include.lincomb}{Logcial Include the summary for the the linear combinations or not}
+##!  \item{x}{a \code{summary.inla} object produced by \code{summary.inla}.}
 ##!  \item{...}{ other arguments.}
 ##!
 ##!}
@@ -40,15 +38,15 @@
 ##!  \item{random}{the component from \code{object}.}
 ##!  \item{neffp}{the component from \code{object}.}          
 ##!  \item{linear.predictor}{the component from \code{object}.}
-##!  \item{lincomb}{the component from \code{object}.}
-##!  \item{lincomb.derived}{the component from \code{object}.}
 ##!  \item{family}{the component from \code{object}.}   
 ##!}
-##!\author{Sara Martino and Havard Rue}
+##!\author{Sara Martino}
 ##!\seealso{ \code{\link{inla}} }
 
-`summary.inla` = function(object, ..., digits = 4L, include.lincomb = TRUE)
+
+`summary.inla` = function(object, ...)
 {
+    digits = 4
     inla.eval.dots(...)
     
     ## provides a summary for a inla object
@@ -73,24 +71,12 @@
     if(!is.null(object$summary.fixed) && length(object$summary.fixed) > 0) 
         ret = c(ret, list(fixed=round(as.matrix(object$summary.fixed), digits)))
 
-    if (include.lincomb) {
-        if(!is.null(object$summary.lincomb) && any(names(object) == "summary.lincomb")
-           && (length(object$summary.lincomb) > 0)) 
-            ret = c(ret, list(lincomb=round(as.matrix(object$summary.lincomb), digits)))
-        if(!is.null(object$summary.lincomb.derived) && length(object$summary.lincomb.derived) > 0)
-            ret = c(ret, list(lincomb.derived=round(as.matrix(object$summary.lincomb.derived),
-                                  digits)))
-    } else {
-        if(!is.null(object$summary.lincomb) && any(names(object) == "summary.lincomb")
-           && (length(object$summary.lincomb) > 0)) {
-            m = nrow(as.matrix(object$summary.lincomb))
-            ret = c(ret, list(lincomb=paste("<", m, " lincomb not included>", sep="")))
-        }
-        if(!is.null(object$summary.lincomb.derived) && length(object$summary.lincomb.derived) > 0) {
-            m = nrow(as.matrix(object$summary.lincomb.derived))
-            ret = c(ret, list(lincomb.derived=paste("<", m, " lincomb.derived not included>", sep="")))
-        }
-    }
+    if(!is.null(object$summary.lincomb) && any(names(object) == "summary.lincomb")
+       && (length(object$summary.lincomb) > 0)) 
+        ret = c(ret, list(lincomb=round(as.matrix(object$summary.lincomb), digits)))
+    
+    if(!is.null(object$summary.lincomb.derived) && length(object$summary.lincomb.derived) > 0)
+        ret = c(ret, list(lincomb.derived=round(as.matrix(object$summary.lincomb.derived), digits)))
 
     if(!is.null(object$summary.hyperpar) && length(object$summary.hyperpar) > 0)
         ret = c(ret, list(hyperpar=round(object$summary.hyperpar, digits)))
@@ -126,7 +112,7 @@
 
 `print.summary.inla` = function(x, ...)
 {
-    digits = 4L
+    digits = 4
     cat("\nCall:\n", inla.formula2character(x$call), "\n\n", sep = "")
     if (inla.is.element("cpu.used",  x)) {
         cat("Time used:\n")
@@ -143,21 +129,14 @@
 
     if (inla.is.element("lincomb.derived", x)) {
         cat("Linear combinations (derived):\n")
-        if (is.character(x$lincomb.derived)) {
-            cat("\t", x$lincomb.derived)
-        } else {
-            print.default(x$lincomb.derived)
-        }
+        print.default(x$lincomb.derived)
         cat("\n")
     }
-    
+
+    ## auto-tab error if not....
     if (inla.is.element("lincomb", x)) {
         cat("Linear combinations:\n")
-        if (is.character(x$lincomb)) {
-            cat("\t", x$lincomb)
-        } else {
-            print.default(x$lincomb)
-        }
+        print.default(x$lincomb)
         cat("\n")
     }
 

@@ -15,7 +15,6 @@ makedtemp () {
 
 compress_put="z"
 compress_get="z"
-Logfile="Logfile.txt"
 ## this one is fixed, do not change
 SSHDefaultPort=22
 
@@ -72,7 +71,6 @@ remove="$3"
 rdir=tmp/.inla.remote
 tarfile=results$RANDOM$RANDOM.tar
 tarfile_to=$(maketemp).tar
-logfile_to=$(maketemp).log
 dirto=$(makedtemp)
 if [ "$id" = "NULL" ]; then
     no=0
@@ -92,7 +90,6 @@ if [ "$cmd" = "stat" ]; then
     	for d in \$(ls -1 .); do \
             if [ -d \$d -a -f \$d/jobid -a -f \$d/.inla.pid -a \! -f \$d/working ]; then \
 	        nno=\$[ \$nno + 1 ]; \
-		siz=\$(du -sm \$d | cut	-f1); \
 	        if [ $no -eq 0 -o $no -eq \$nno -o \$(cat \$d/jobid) = "$id" ]; then \
        	            if [ -f \$d/done ]; then \
 	                status="\""Finished"\""; \
@@ -101,7 +98,7 @@ if [ "$cmd" = "stat" ]; then
 	            else	\
 	                status="\""Aborted"\""; \
                     fi; \
-	            echo \"\$(cat \$d/jobid) \$nno  \$(cat \$d/.inla.pid) \$status \${siz}Mb \"; \
+	            echo \"\$(cat \$d/jobid) \$nno   \$(cat \$d/.inla.pid)    \$status\"; \
                 fi; \
             fi; \
         done"
@@ -117,7 +114,7 @@ elif [ "$cmd" = "get" ]; then
 	            if [ $no -eq \$nno -o \$(cat \$d/jobid) = "$id" ]; then \
 	                 cd \$d; \
 			 if [ -f done ]; then \
-			     if \[ -f $Logfile \]; then cp $Logfile results.files; fi; \
+			     if \[ -f Logfile.txt \]; then cp Logfile.txt results.files; fi; \
 			     tar cf ../$tarfile results.files; \
 			     if [ $remove -eq 1 ]; then \
                                  cd ..; rm -rf \$d; \
@@ -133,27 +130,6 @@ elif [ "$cmd" = "get" ]; then
     rm -f "$tarfile_to"
     rm -f "${tarfile_to%.tar}"
     echo "$dirto"
-
-elif [ "$cmd" = "log" ]; then    
-
-    ssh -p$Port $sshArguments $RemoteUser@$RemoteHost "
-            cd $rdir; \
-	    nno=0; \
-    	    for d in \$(ls -1 .); do \
-                if [ -d \$d ]; then \
-	            nno=\$[ \$nno + 1 ]; \
-	            if [ $no -eq \$nno -o \$(cat \$d/jobid) = "$id" ]; then \
-		       if [ -f \$d/$Logfile ]; then \
-                           cp \$d/$Logfile .; \
-                       else \
-		           touch $Logfile; \
-                       fi; \
-	            fi; \
-                fi; \
-             done"
-    scp -P$Port -B -C -p -q $RemoteUser@$RemoteHost:$rdir/$Logfile "$logfile_to" >/dev/null 2>&1 
-    ssh -p$Port $sshArguments $RemoteUser@$RemoteHost "rm -f $rdir/$Logfile" 
-    echo "LOG $logfile_to" 
 
 elif [ "$cmd" = "del" ]; then
     

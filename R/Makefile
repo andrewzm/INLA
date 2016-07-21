@@ -8,7 +8,7 @@ make-man-pages.timestamp: $(wildcard *.R)
 clean :; rm make-man-pages.timestamp
 
 TAGS : $(wildcard *.R)
-	R --vanilla -e 'library(utils); rtags(path=".", ofile="TAGS")'
+	etags $^
 
-.PHONY : all clean
+.PHONY : all clean TAGS all
 

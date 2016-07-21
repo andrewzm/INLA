@@ -53,8 +53,7 @@
                               "wrappedcauchy",
                               "iidgamma",
                               "simplex", 
-                              "gamma",
-                              "beta"))) {
+                              "gamma"))) {
 
         if (is.null(scale)) {
             scale = rep(1.0, n.data)
@@ -104,7 +103,6 @@
         response = response[!null.dat,]
 
     } else if (inla.one.of(family, c("poisson",
-                                     "cenpoisson", 
                                      "gpoisson", 
                                      "zeroinflatedpoisson0",
                                      "zeroinflatedpoisson1", 
@@ -249,7 +247,7 @@
         }
 
     } else if (inla.one.of(family, c("stochvol", "stochvolt", "stochvolnig", "loggammafrailty",
-                                     "iidlogitbeta", "kumar"))) {
+                                     "iidlogitbeta", "beta", "kumar"))) {
 
         response = cbind(ind, y.orig)
         null.dat = is.na(response[, 2L])

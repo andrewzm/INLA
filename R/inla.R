@@ -155,7 +155,7 @@
         ##!nodes in the latent field. The posterior distribution
         ##!of such linear combination is computed by the
         ##!\code{inla} function. See
-        ##!\url{www.r-inla.org/faq} for examples of
+        ##!\url{http://www.r-inla.org/help/faq} for examples of
         ##!how to define such linear combinations.}
         lincomb = NULL,
         
@@ -464,11 +464,6 @@
     ## expansion might occur.
     control.compute = inla.check.control(control.compute, data)
     control.predictor = inla.check.control(control.predictor, data)
-    ## I need to check for NA's already here.
-    if (!is.null(control.predictor$A)) {
-        control.predictor$A[ is.na(control.predictor$A) ] = 0
-        control.predictor$A = inla.as.sparse(control.predictor$A)
-    }
     ## do not check control.family here, as we need to know n.family
     control.inla = inla.check.control(control.inla, data)
     control.results = inla.check.control(control.results, data)
@@ -782,6 +777,7 @@
     ## control predictor section
     cont.predictor = inla.set.control.predictor.default()
     cont.predictor[names(control.predictor)] = control.predictor
+
     cont.predictor$hyper = inla.set.hyper("predictor", "predictor",
         cont.predictor$hyper, cont.predictor$initial,
         cont.predictor$fixed, cont.predictor$prior, cont.predictor$param)
@@ -824,17 +820,10 @@
     control.family.save = control.family
     for(ii in 1:n.family) {
         control.family = control.family.save[[ii]]
-        ## need to be able to say when n.family =  1
-        ## control.family = list(
-        ##    list(hyper = list(), control.link = list())))
-        while (is.list(control.family) &&
-               length(control.family) > 0 &&
-               is.null(names(control.family))) {
-            control.family = control.family[[1]]
-        }
         control.family.save[[ii]] = inla.check.control(control.family, data)
     }
     control.family = control.family.save
+    
     cont.family = list(list())
     for(i.family in 1:n.family) {
         cont.family[[i.family]] = inla.set.control.family.default()
@@ -857,7 +846,6 @@
                                    cont.family[[i.family]]$prior,
                                    cont.family[[i.family]]$param)
         all.hyper$family[[i.family]] = list(
-                            hyperid = paste("INLA.Data", i.family, sep=""), 
                             label = family[i.family],
                             hyper = cont.family[[i.family]]$hyper)
         
@@ -1004,7 +992,7 @@
     ## offset = as.vector(model.extract(mf, "offset"))
 
     for (nm in c("scale", "weights", "Ntrials", "offset", "E", "strata", "link.covariates")) {
-        inla.eval(paste("tmp = try(eval(mf$", nm, ", data, enclos = parent.frame()), silent=TRUE)", sep=""))
+        inla.eval(paste("tmp = try(eval(mf$", nm, ", data), silent=TRUE)", sep=""))
         if (!is.null(tmp) && !inherits(tmp, "try-error")) {
             inla.eval(paste("mf$", nm, " = NULL", sep=""))
             inla.eval(paste(nm, " = tmp"))
@@ -1219,6 +1207,9 @@
     j=0
     extra.fixed=0
 
+    rgeneric = list()
+    nrgeneric = 0
+    
     if (nr>0) {
         name.random.dir=c()
         if (nr!=(ncol(rf)-1))
@@ -1292,6 +1283,13 @@
         
         for (r in 1:nr) {
             n = nrep = ngroup = N = NULL
+            
+            if (gp$random.spec[[r]]$model == "rgeneric") {
+                ## collect it and give it an Id
+                nrgeneric = nrgeneric + 1L
+                rgeneric[[nrgeneric]] = gp$random.spec[[r]]$rgeneric
+                gp$random.spec[[r]]$rgeneric$Id = nrgeneric
+            }
             
             if (gp$random.spec[[r]]$model != "linear") {
                 ##in this case we have to add a FFIELD section.........
@@ -1388,25 +1386,6 @@
                             stop(paste("There are one or more NA's in 'group' where 'idx' in f(idx,...) is not NA: idx = \'",
                                        gp$random.spec[[r]]$term, "\'", sep=""))
                         group[ is.na(xx) ] = 1
-
-                        ## issue a WARNING,  if there are to many unused groups
-                        g.used = unique(sort(group))
-                        g.unused = setdiff(1:ngroup, g.used)
-                        ng.used = length(g.used)
-                        ng.unused = length(g.unused)
-
-                        txt = paste("f(", gp$random.spec[[r]]$term, ", ...)",  sep="")
-                        if (!is.element(1, g.used)) {
-                            warning(paste(txt, ": ", 
-                                          "There is no indices where group[]=1, this is *usually* a misspesification"),
-                                    immediate. = TRUE)
-                        }
-                        if (ng.unused >= ng.used) {
-                            warning(paste(txt, ": ", 
-                                          "Number of unused groups >= the number of groups used: ", ng.unused, " >= ", ng.used, 
-                                        ", this is *usually* a misspesification", sep=""),
-                                    immediate. = TRUE)
-                        }
                     }
                 } else {
                     N = NULL
@@ -1544,9 +1523,6 @@
                 file.loc=inla.tempfile(tmpdir=data.dir)
                 if (inla.getOption("internal.binary.mode")) {
                     inla.write.fmesher.file(as.matrix(as.numeric(location[[r]]), ncol = 1),  filename = file.loc, debug = debug)
-                    ## prevent some numerical instabilities for models rw1, rw2, crw2, etc...
-                    inla.check.location(location[[r]], term = gp$random.spec[[r]]$term,
-                                        model = gp$random.spec[[r]]$model, section = "latent")
                 } else {
                     file.create(file.loc)
                     write(as.numeric(location[[r]]), ncolumns=1, file=file.loc, append=FALSE)
@@ -1555,6 +1531,7 @@
                 
                 ## this have to match
                 stopifnot(length(covariate[[r]]) == NPredictor)
+
                 file.cov=inla.tempfile(tmpdir=data.dir)
                 if (inla.getOption("internal.binary.mode")) {
                     inla.write.fmesher.file(as.matrix(cbind(indN, covariate[[r]])), filename=file.cov, debug = debug)
@@ -1728,24 +1705,18 @@
 
                     n.weights = n.weights+1
                 }
+                ##create a FFIELD section
+                all.hyper$random[[r]] = list(label = inla.namefix(gp$random.spec[[r]]$term),
+                                    hyper = gp$random.spec[[r]]$hyper)
 
-                ## for some models, the priors are computed in this function. in these cases, we
-                ## need to updated all.hyper with these priors, not the ones that goes into this
-                ## function...
-                rs.updated = (inla.ffield.section(file=file.ini,
-                                                  file.loc=file.loc, file.cov=file.cov,
-                                                  file.id.names = file.id.names, 
-                                                  file.extraconstr=file.extraconstr, 
-                                                  file.weights=file.weights, n=n, nrep = nrep, ngroup = ngroup,
-                                                  random.spec=gp$random.spec[[r]], 
-                                                  results.dir=paste("random.effect", inla.num(count.random), sep=""), 
-                                                  only.hyperparam= only.hyperparam,
-                                                  data.dir=data.dir))
-                all.hyper$random[[r]] = (list(hyperid = inla.namefix(gp$random.spec[[r]]$term),
-                                              hyper = rs.updated$hyper,
-                                              group.hyper = rs.updated$control.group$hyper))
-
-
+                inla.ffield.section(file=file.ini, file.loc=file.loc, file.cov=file.cov,
+                                    file.id.names = file.id.names, 
+                                    file.extraconstr=file.extraconstr, 
+                                    file.weights=file.weights, n=n, nrep = nrep, ngroup = ngroup,
+                                    random.spec=gp$random.spec[[r]], 
+                                    results.dir=paste("random.effect", inla.num(count.random), sep=""), 
+                                    only.hyperparam= only.hyperparam,
+                                    data.dir=data.dir)
             } else if (inla.one.of(gp$random.spec[[r]]$model, "linear")) {
                 ##....while here we have to add a LINEAR section
                 count.linear = count.linear+1
@@ -1842,9 +1813,6 @@
     inla.eval(paste("Sys.setenv(", "\"INLA_PATH\"", "=\"", system.file("bin", package="INLA"), "\"", ")", sep=""))
     inla.eval(paste("Sys.setenv(", "\"INLA_OS\"", "=\"", inla.os.type() , "\"", ")", sep=""))
     inla.eval(paste("Sys.setenv(", "\"INLA_HGVERSION\"", "=\"", inla.version("hgid") , "\"", ")", sep=""))
-    rversion = paste(R.Version()$major, ".", strsplit(R.Version()$minor,"[.]")[[1]][1], sep="")
-    inla.eval(paste("Sys.setenv(", "\"INLA_RVERSION\"", "=\"", rversion , "\"", ")", sep=""))
-    inla.eval(paste("Sys.setenv(", "\"INLA_RHOME\"", "=\"", Sys.getenv("R_HOME") , "\"", ")", sep=""))
     if (debug) {
         inla.eval(paste("Sys.setenv(", "\"INLA_DEBUG=\"", "=\"", 1, "\"", ")", sep=""))
     }
@@ -1871,11 +1839,34 @@
     ## ...meaning that if inla.call = "" then just build the files (optionally...)
     if (nchar(inla.call) > 0) {
         if (inla.os("linux") || inla.os("mac")) {
-            if (verbose) {
-                echoc = system(paste(shQuote(inla.call), all.args, shQuote(file.ini)))
+            if (nrgeneric > 0L) {
+                if (!inla.require("parallel")) {
+                    stop("Library 'parallel' is required to use the 'rgeneric'-model.")
+                }
+                if (inla.os("mac")) {
+                    ## cannot run in verbose mode
+                    all.args = gsub("-v", "", all.args)
+                    tmp.0 = mcparallel(system(paste(shQuote(inla.call), all.args, shQuote(file.ini))))
+                } else {
+                    if (verbose) {
+                        tmp.0 = mcparallel(system(paste(shQuote(inla.call), all.args, shQuote(file.ini))))
+                    } else {
+                        tmp.0 = mcparallel(system(paste(shQuote(inla.call), all.args, shQuote(file.ini), " > ", file.log,
+                            inla.ifelse(silent == 2L, " 2>/dev/null", ""))))
+                    }
+                }
+                for (i in 1L:nrgeneric) {
+                    inla.eval(paste("tmp.", i, " = mcparallel(inla.rgeneric.loop(rgeneric[[", i, "]], debug=debug))", sep=""))
+                }
+                inla.eval(paste("tmp = mccollect(list(tmp.0,", paste("tmp.", 1L:nrgeneric, collapse=",", sep=""), "))"))
+                echoc = tmp[[1L]]
             } else {
-                echoc = system(paste(shQuote(inla.call), all.args, shQuote(file.ini), " > ", file.log,
-                    inla.ifelse(silent == 2L, " 2>/dev/null", "")))
+                if (verbose) {
+                    echoc = system(paste(shQuote(inla.call), all.args, shQuote(file.ini)))
+                } else {
+                    echoc = system(paste(shQuote(inla.call), all.args, shQuote(file.ini), " > ", file.log,
+                        inla.ifelse(silent == 2L, " 2>/dev/null", "")))
+                }
             }
         } else if (inla.os("windows")) {
             if (!remote && !submit) {
@@ -2054,3 +2045,4 @@
     }
     return (data)
 }
+

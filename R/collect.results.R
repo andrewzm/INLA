@@ -165,26 +165,21 @@
         mode.status = misc$mode.status
 
         if (!is.null(misc$lincomb.derived.correlation.matrix)) {
-            if (!is.null(res.lincomb.derived)) {
-                id = res.lincomb.derived$summary.lincomb.derived$ID
-                tag = rownames(res.lincomb.derived$summary.lincomb.derived)
-                R = misc$lincomb.derived.correlation.matrix
-                rownames(R) = colnames(R) = tag[id]
-                misc$lincomb.derived.correlation.matrix = R
-            } else {
-                misc$lincomb.derived.correlation.matrix = NULL
-            }
+            stopifnot(!is.null(res.lincomb.derived))
+            id = res.lincomb.derived$summary.lincomb.derived$ID
+            tag = rownames(res.lincomb.derived$summary.lincomb.derived)
+            R = misc$lincomb.derived.correlation.matrix
+            rownames(R) = colnames(R) = tag[id]
+            misc$lincomb.derived.correlation.matrix = R
         }
         if (!is.null(misc$lincomb.derived.covariance.matrix)) {
-            if (!is.null(res.lincomb.derived)) {
-                id = res.lincomb.derived$summary.lincomb.derived$ID
-                tag = rownames(res.lincomb.derived$summary.lincomb.derived)
-                R = misc$lincomb.derived.covariance.matrix
-                rownames(R) = colnames(R) = tag[id]
-                misc$lincomb.derived.covariance.matrix = R
-            } else {
-                misc$lincomb.derived.covariance.matrix = NULL
-            }
+            ## same code as above
+            stopifnot(!is.null(res.lincomb.derived))
+            id = res.lincomb.derived$summary.lincomb.derived$ID
+            tag = rownames(res.lincomb.derived$summary.lincomb.derived)
+            R = misc$lincomb.derived.covariance.matrix
+            rownames(R) = colnames(R) = tag[id]
+            misc$lincomb.derived.covariance.matrix = R
         }
 
         ## also put the linkfunctions here
@@ -446,7 +441,6 @@ inla.internal.experimental.mode = FALSE
             configs$config[[configs$nconfig]] = list()
             for(k in 1L:configs$nconfig) {
                 log.post = readBin(fp, numeric(), 1)
-                log.post.orig = readBin(fp, numeric(), 1)
                 if (configs$ntheta > 0L) {
                     theta = readBin(fp, numeric(), configs$ntheta)
                     names(theta) = theta.tag
@@ -478,7 +472,6 @@ inla.internal.experimental.mode = FALSE
                 configs$config[[k]] = list(
                                       theta = theta, 
                                       log.posterior = log.post, 
-                                      log.posterior.orig = log.post.orig, 
                                       mean = mean,
                                       improved.mean = improved.mean,
                                       skewness = skewness, 
@@ -499,10 +492,9 @@ inla.internal.experimental.mode = FALSE
             }
 
             ## rescale the log.posteriors
-            configs$max.log.posterior = max(sapply(configs$config, function(x) x$log.posterior.orig))
+            configs$max.log.posterior = max(sapply(configs$config, function(x) x$log.posterior))
             for(k in 1L:configs$nconfig) {
                 configs$config[[k]]$log.posterior = configs$config[[k]]$log.posterior - configs$max.log.posterior
-                configs$config[[k]]$log.posterior.orig = configs$config[[k]]$log.posterior.orig - configs$max.log.posterior
             }
         } else {
             configs$config = NULL
@@ -556,13 +548,6 @@ inla.internal.experimental.mode = FALSE
     if (is.na(siz[5L]) || siz[5L] <= 0L) siz[5L] = 1L
 
     return (list(n=siz[1L], N = siz[2L], Ntotal = siz[3L], ngroup = siz[4L], nrep=siz[5L]))
-}
-
-`inla.collect.hyperid` = function(dir, debug = FALSE)
-{
-    fnm = paste(dir, "/hyperid.dat", sep="")
-    id = readLines(fnm)
-    return (id)
 }
 
 `inla.collect.fixed` = function(results.dir, debug = FALSE)
@@ -982,9 +967,7 @@ inla.internal.experimental.mode = FALSE
         ## compute waic
         return (list(
             waic = -2*(sum(log(po.res), na.rm=TRUE) - sum(po2.res, na.rm=TRUE)),
-            p.eff = sum(po2.res, na.rm=TRUE), 
-            local.waic=-2*(log(po.res)-po2.res), 
-            local.p.eff=po2.res))
+            p.eff = sum(po2.res, na.rm=TRUE)))
     } else {
         return (NULL)
     }
@@ -1067,43 +1050,40 @@ inla.internal.experimental.mode = FALSE
     function(results.dir,
              debug = FALSE)
 {
-    my.read.pnm = function(...) {
-        args = list(...)
-        filename = args[[1]]
-        if (file.exists(filename) && inla.require("pixmap")) {
-            ## disable warnings
-            warn = getOption("warn")
-            options(warn=-1L) ## disable...
-            ret = pixmap::read.pnm(...)
-            do.call("options", args = list(warn = warn))
-        } else {
-            if (file.exists(filename)) {
-                warning("You need to install 'pixmap' to read bitmap files.")
-            }
-            ret = NULL
-        }
-        return (ret)
-    }
-
     alldir = dir(results.dir)
     if (length(grep("^Q$", alldir))==1L) {
+        pixm = inla.require("pixmap")
         if (debug)
             cat(paste("collect q\n", sep=""))
         
         file=paste(results.dir, .Platform$file.sep,"Q/precision-matrix.pbm", sep="")
-        Q.matrix = my.read.pnm(file)
 
-        file=paste(results.dir, .Platform$file.sep,"Q/precision-matrix-reordered.pbm", sep="")
-        Q.matrix.reorder = my.read.pnm(file)
-
-        file=paste(results.dir, .Platform$file.sep,"Q/precision-matrix_L.pbm", sep="")
-        L = my.read.pnm(file)
-
-        if (is.null(Q.matrix) && is.null(Q.matrix.reorder) && is.null(L)) {
-            q = NULL
-        } else {
-            q = list(Q = Q.matrix, Q.reorder = Q.matrix.reorder, L = L)
+        ## tell...
+        if (file.exists(file) && !pixm) {
+            warning("You need to install library 'pixmap' to read bitmap images of the precision matrix files.")
         }
+            
+        if (file.exists(file) && pixm)
+            Q.matrix = read.pnm(file)
+        else
+            Q.matrix = NULL
+        
+        file=paste(results.dir, .Platform$file.sep,"Q/precision-matrix-reordered.pbm", sep="")
+        if (file.exists(file) && pixm)
+            Q.matrix.reorder = read.pnm(file)
+        else
+            Q.matrix.reorder = NULL
+        
+        file=paste(results.dir, .Platform$file.sep,"Q/precision-matrix_L.pbm", sep="")
+        if (file.exists(file) && pixm)
+            L = read.pnm(file)
+        else
+            L = NULL
+
+        if (is.null(Q.matrix) && is.null(Q.matrix.reorder) && is.null(L))
+            q = NULL
+        else
+            q = list(Q = Q.matrix, Q.reorder = Q.matrix.reorder, L = L)
     } else {
         q = NULL
     }
@@ -1159,7 +1139,6 @@ inla.internal.experimental.mode = FALSE
             first.time = (i == 1L)
             dir.hyper =  paste(results.dir, .Platform$file.sep, hyper[i], sep="")
             file = paste(dir.hyper, .Platform$file.sep,"summary.dat", sep="")
-            hyperid = inla.collect.hyperid(dir.hyper)
             dd = inla.read.binary.file(file)[-1L]
             summ = dd
             if (first.time)
@@ -1190,7 +1169,6 @@ inla.internal.experimental.mode = FALSE
             file =paste(results.dir, .Platform$file.sep, hyper[i], .Platform$file.sep,"marginal-densities.dat", sep="")
             xx = inla.read.binary.file(file)
             marg1 = inla.interpret.vector(xx, debug=debug)
-            attr(marg1, "hyperid") = hyperid
             rm(xx)
             if (!is.null(marg1)) {
                 colnames(marg1) = c("x","y")
@@ -1241,7 +1219,6 @@ inla.internal.experimental.mode = FALSE
             first.time = (i == 1L)
             dir.hyper =  paste(results.dir, .Platform$file.sep, hyper[i], sep="")
             file = paste(dir.hyper, .Platform$file.sep,"summary.dat", sep="")
-            hyperid = inla.collect.hyperid(dir.hyper)
             dd = inla.read.binary.file(file)[-1L]
             summ = dd
             if (first.time)
@@ -1274,7 +1251,6 @@ inla.internal.experimental.mode = FALSE
             file =paste(results.dir, .Platform$file.sep, hyper[i], .Platform$file.sep,"marginal-densities.dat", sep="")
             xx = inla.read.binary.file(file)
             marg1 = inla.interpret.vector(xx, debug=debug)
-            attr(marg1, "hyperid") = hyperid
             rm(xx)
             if (!is.null(marg1))
                 colnames(marg1) = c("x","y")

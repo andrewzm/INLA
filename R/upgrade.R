@@ -10,15 +10,14 @@
 ##!  current version.}
 ##!
 ##!\usage{
-##!inla.upgrade(lib = NULL, testing=FALSE, ask = TRUE)
-##!inla.update(lib = NULL, testing=FALSE, ask = TRUE)
+##!inla.upgrade(lib = NULL, testing=FALSE)
+##!inla.update(lib = NULL, testing=FALSE)
 ##!}
 ##!
 ##!\arguments{
 ##!  \item{lib}{Location to install the library.}
 ##!  \item{testing}{If \code{TRUE}, then look for a test-version if the
 ##!    INLA-package.}
-##!  \item{ask}{same argument as in \code{update.packages}}
 ##!}
 ##!\value{\code{inla.upgrade} will update the INLA package to the current version, 
 ##! and \code{inla.update} do the same 
@@ -29,24 +28,20 @@
 
 ### The upgrade utility
 
-`inla.update` = function(lib = NULL, testing = FALSE, ask = TRUE)
+`inla.update` = function(lib = NULL, testing = FALSE)
 {
-    inla.upgrade(lib=lib, testing=testing, ask = ask)
+    inla.upgrade(lib=lib, testing=testing)
 }
 
-`inla.upgrade` = function(lib = NULL, testing = FALSE, ask = TRUE)
+`inla.upgrade` = function(lib = NULL, testing = FALSE)
 {
-    repo=c(CRAN = "https://cran.rstudio.com",
-        INLA = paste("https://www.math.ntnu.no/inla/R/",
+    repo=c(CRAN = "http://cran.rstudio.com",
+        INLA = paste("http://www.math.ntnu.no/inla/R/",
             (if (testing) "testing" else "stable"),  sep=""))
     if (require("INLA", quietly = TRUE, lib.loc = lib, character.only=TRUE)) {
-        update.packages(repos = repo, oldPkgs = "INLA", ask = ask)
-        cat("\n *** Please restart R to load package 'INLA'\n\n")
+        update.packages(repos = repo, oldPkgs = "INLA")
     } else {
-        install.packages(pkgs = "INLA", lib = lib, repos = repo,
-                         dependencies = TRUE)
-        library("INLA")
+        install.packages(pkgs = "INLA", lib = lib, repos = repo)
     }
-
     return (invisible())
 }

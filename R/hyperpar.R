@@ -16,7 +16,7 @@
 ##!         skip.configurations = TRUE,
 ##!         verbose = FALSE,
 ##!         dz = 0.75,
-##!         diff.logdens = 10,
+##!         diff.logdens = 7,
 ##!         h = NULL,
 ##!         restart = FALSE,
 ##!         quantiles = NULL, 
@@ -48,8 +48,8 @@
 
         ##!\item{diff.logdens}{The difference of the
         ##!log.density for the hyperpameters to stop numerical
-        ##!integration using int.strategy='grid'.  Default 10}
-        diff.logdens = 10,
+        ##!integration using int.strategy='grid'.  Default 7}
+        diff.logdens = 7,
 
         ##!\item{h}{The step-length for the gradient
         ##!calculations for the hyperparameters. Default 0.01.}
@@ -123,15 +123,12 @@
     ## replace this into inla.call="remote"
     result.tmp$.args$inla.call = sub("inla.submit", "inla.remote", result.tmp$.args$inla.call)
         
-    ## store this one, for later usage
-    copy.misc = result$misc
-    
     ## call itself
     result.tmp = inla.rerun(result.tmp, plain = TRUE)
     
     ## these are the entries that we want to replace
     replace.names = c("summary.hyperpar", "marginals.hyperpar", "internal.marginals.hyperpar",
-        "internal.summary.hyperpar", "joint.hyper", "mlik", "version", "cpu.used", "misc")
+            "internal.summary.hyperpar", "joint.hyper", "mlik", "version", "cpu.used", "misc")
 
     for (nm in replace.names) {
         idx.result = which(names(result) == nm)
@@ -140,10 +137,6 @@
             result[[idx.result]] = result.tmp[[idx.result.tmp]]
         }
     }
-    
-    ## copy these, as they are special
-    result$misc$lincomb.derived.covariance.matrix = copy.misc$lincomb.derived.covariance.matrix
-    result$misc$lincomb.derived.correlation.matrix = copy.misc$lincomb.derived.correlation.matrix
 
     return(result)
 }

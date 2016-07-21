@@ -114,11 +114,11 @@
 `inla.call.builtin` = function()
 {
     if (inla.os("mac")) {
-        fnm = system.file(paste("bin/mac/", inla.os.32or64bit(), "bit/inla.run", sep=""), package="INLA")
+        fnm = system.file(paste("bin/mac/", inla.os.32or64bit(), "bit/inla", sep=""), package="INLA")
     } else if (inla.os("linux")) {
-        fnm = system.file(paste("bin/linux/", inla.os.32or64bit(), "bit/inla.run", sep=""), package="INLA")
+        fnm = system.file(paste("bin/linux/inla", inla.os.32or64bit(), sep=""), package="INLA")
     } else if (inla.os("windows")) {
-        fnm = system.file(paste("bin/windows/", inla.os.32or64bit(), "bit/inla.exe", sep=""), package="INLA")
+        fnm = system.file(paste("bin/windows/inla", inla.os.32or64bit(), ".exe", sep=""), package="INLA")
     } else {
         stop("Unknown OS")
     }
@@ -133,11 +133,11 @@
 `inla.fmesher.call.builtin` = function()
 {
     if (inla.os("mac")) {
-        fnm = system.file(paste("bin/mac/", inla.os.32or64bit(), "bit/fmesher.run", sep=""), package="INLA")
+        fnm = system.file(paste("bin/mac/", inla.os.32or64bit(), "bit/fmesher", sep=""), package="INLA")
     } else if (inla.os("linux")) {
-        fnm = system.file(paste("bin/linux/", inla.os.32or64bit(), "bit/fmesher.run", sep=""), package="INLA")
+        fnm = system.file(paste("bin/linux/fmesher", inla.os.32or64bit(), sep=""), package="INLA")
     } else if (inla.os("windows")) {
-        fnm = system.file(paste("bin/windows/", inla.os.32or64bit(), "bit/fmesher.exe", sep=""), package="INLA")
+        fnm = system.file(paste("bin/windows/fmesher", inla.os.32or64bit(), ".exe", sep=""), package="INLA")
     } else {
         stop("Unknown OS")
     }
@@ -785,13 +785,7 @@
     return (is.element(pkg, installed.packages()[,1L]))
 }
 
-`inla.require` = function(pkg, ...)
-{
-    ## follow the `new' standard...
-    return (requireNamespace(pkg, quietly = TRUE, ...))
-}
-
-`inla.require.old` = function(pkg)
+`inla.require` = function(pkg)
 {
     ## load PKG if it exists, but be silent. return status
     w = getOption("warn")
@@ -816,7 +810,7 @@
         return (invisible())
     }
     dots = lapply(match.call(), eval, envir = parent.frame())[-1L]
-    for(i in seq_along(dots)) {
+    for(i in seq_along(length(dots))) {
         nm = names(dots)[i]
         if (!is.null(nm)) {
             if (!is.null(allowed.names)) {
@@ -943,10 +937,10 @@
         if (is.null(mc.cores)) {
             mc.cores = inla.getOption("num.threads")
             if (is.null(mc.cores)) {
-                mc.cores = parallel::detectCores()
+                mc.cores = detectCores()
             }
         }
-        return (parallel::mclapply(..., mc.cores = mc.cores))
+        return (mclapply(..., mc.cores = mc.cores))
     } else {
         return (lapply(...))
     }
@@ -954,7 +948,7 @@
 `inla.cmpfun` = function(fun, options = list(optimize = 3L))
 {
     if (inla.require("compiler")) {
-        return (compiler::cmpfun(fun, options = options))
+        return (cmpfun(fun, options = options))
     } else {
         return(fun)
     }
@@ -1005,43 +999,25 @@
 `inla.runjags2dataframe` = function(runjags.object)
 {
     ## convert from runjags-output to a data.frame
-    stopifnot(inla.require("runjags"))
-    return (as.data.frame(runjags::combine.mcmc(runjags.object, collapse.chains=TRUE)))
-}
-
-`inla.check.location` = function(loc, term, model, section = "latent")
-{
-    if (is.null(loc) || length(loc) <= 1) {
-        return (invisible())
-    }
-    lim = inla.model.properties(model, section)$min.diff
-    if (is.null(lim))
-        return (invisible())
+    inla.require("runjags")
+    return (as.data.frame(combine.mcmc(runjags.object, collapse.chains=TRUE)))
     
-    min.diff = min(diff(sort(loc)))/diff(range(loc))
-    if (min.diff < lim) {
-        stop(paste(sep = "", 
-                   "Locations are too close for f(",
-                   term, ", model=\"",
-                   model, "\", ...): ", 
-                   " min.diff = ",
-                   format(min.diff, scientific=TRUE, digits=4),
-                   " < ", format(lim, scientific=TRUE, digits=4), "\n", 
-                   "  You can fix this by some kind of binning, see ?inla.group", "\n",
-                   "  If you want/need to bypass this check at your own risk, do", "\n", 
-                   "\t> m = get(\"inla.models\", INLA:::inla.get.inlaEnv())\n", 
-                   "\t> m$", section, "$", model, "$min.diff = NULL\n", 
-                   "\t> assign(\"inla.models\", m, INLA:::inla.get.inlaEnv())"))
-        
-    }
-    return (invisible())
-}
+    ## old code
+    r = runjags.object$mcmc
+    nchains = length(r)
+    nvar = ncol(r[[1]])
+    len = nrow(r[[1]]) * nchains
+    len2 = nrow(r[[1]])
+    stopifnot(nchains > 0)
+    stopifnot(nvar > 0)
 
-`inla.dynload.workaround` = function()
-{
-    ## setup the static builds instead
-    d = dirname(inla.call.builtin())
-    inla.setOption(inla.call = paste(d,"/inla.static", sep=""))
-    inla.setOption(fmesher.call = paste(d,"/fmesher.static", sep=""))
-    return (invisible())
+    result = matrix(NA, nrow = len, ncol = nvar)
+    colnames(result) = colnames(r[[1]])
+    for(i in 1:nvar) {
+        for(j in 1:nchains) {
+            result[(j-1)*len2 + 1:len2, i] = r[[j]][, i]
+        }
+    }
+
+    return (as.data.frame(result))
 }
